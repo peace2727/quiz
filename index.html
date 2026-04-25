@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>한국사 암기 퀴즈</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="header">
+        <h1 class="title">한국사 암기 퀴즈</h1>
+        <p class="subtitle">문제(설명)를 보고 답안을 확인해요. 다음 문제는 랜덤으로 나옵니다.</p>
+      </header>
+
+      <section class="card" aria-live="polite">
+        <div class="meta">
+          <span id="progress" class="progress">-</span>
+          <button id="shuffle" class="ghost" type="button">섞기</button>
+        </div>
+
+        <div class="question">
+          <div class="label">문제</div>
+          <div id="prompt" class="prompt">로딩 중…</div>
+        </div>
+
+        <div class="answer">
+          <div class="label">답</div>
+          <div id="answerBox" class="answerBox hidden">
+            <span class="pill" id="answerText">-</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="reveal" class="primary" type="button">답안보기</button>
+          <button id="next" class="secondary" type="button">다음 →</button>
+        </div>
+      </section>
+
+      <section class="editor">
+        <details>
+          <summary>문제/답 데이터 편집하기</summary>
+          <p class="hint">
+            아래 JSON 배열을 수정하면 바로 반영됩니다. 형식: <code>{"answer":"인물","prompt":"설명"}</code>
+          </p>
+          <textarea id="dataEditor" spellcheck="false"></textarea>
+          <div class="editorActions">
+            <button id="applyData" type="button">적용</button>
+            <span id="editorStatus" class="status" role="status" aria-live="polite"></span>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

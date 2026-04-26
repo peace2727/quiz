@@ -132,16 +132,20 @@ function rowsToItems(rows) {
 
   const aIsProblem = headerLike && hA.includes("문제") && hB.includes("키워드");
 
-  // 케이스 1) 3열: A=문제(탭), B=키워드(답), C=설명(문제 본문)
-  // 케이스 2) 2열(헤더가 문제/키워드): A=문제(탭/문제), B=키워드(답)
+  // 케이스 1) 3열: A=문제(탭), B=키워드(화면 "문제"에 표시), C=설명/답(답 영역에 표시)
+  // 케이스 2) 2열(헤더가 문제/키워드): A=문제(탭), B=키워드(화면 "문제"에 표시)
   // 케이스 3) 기존: A=인물(답), B=설명(문제)
   return data
     .map(([a, b, c]) => {
+      if (c && aIsProblem) {
+        return { group: a.trim(), prompt: b.trim(), answer: c.trim() || a.trim() };
+      }
       if (c) {
         return { group: a.trim(), answer: b.trim(), prompt: c.trim() };
       }
       if (aIsProblem) {
-        return { group: a.trim(), answer: b.trim(), prompt: a.trim() };
+        // 탭은 A(문제), 화면의 "문제" 영역은 B(키워드)
+        return { group: a.trim(), prompt: b.trim(), answer: a.trim() };
       }
       return { group: "전체", answer: a.trim(), prompt: b.trim() };
     })
@@ -222,6 +226,7 @@ function loadState() {
 }
 
 function buildOrderForActiveGroup() {
+  if (activeGroup === "전체") return shuffleInPlace(items.map((_, i) => i));
   return shuffleInPlace(
     items
       .map((x, i) => ({ x, i }))
@@ -256,7 +261,7 @@ function setActiveGroup(nextGroup) {
 }
 
 function renderTabs() {
-  const groups = getGroups();
+  const groups = getGroups().filter((g) => g && g !== "전체");
   if (!els.tabs) return;
 
   // group이 하나면 탭 영역 숨김
@@ -267,7 +272,8 @@ function renderTabs() {
   }
 
   els.tabs.classList.remove("hidden");
-  els.tabs.innerHTML = groups
+  const allGroups = ["전체", ...groups];
+  els.tabs.innerHTML = allGroups
     .map((g) => {
       const pressed = g === activeGroup ? "true" : "false";
       return `<button type="button" class="tab ${g === activeGroup ? "isActive" : ""}" data-group="${encodeURIComponent(g)}" aria-pressed="${pressed}">${escapeHtml(g)}</button>`;
@@ -296,7 +302,7 @@ function render() {
   // 현재 그룹에 해당하는 order가 없으면 재생성
   if (order.length === 0) {
     // activeGroup이 items에 없을 수 있으니, 첫 그룹으로 이동
-    const groups = getGroups();
+    const groups = getGroups().filter((g) => g && g !== "전체");
     activeGroup = groups[0] ?? "전체";
     resetOrder();
   }
@@ -333,7 +339,10 @@ function toggleReveal() {
 
 function showEndDialog() {
   const total = order.length;
-  const wrongCount = items.filter((it) => (it.group ?? "전체") === activeGroup && wrongIdSet.has(itemId(it))).length;
+  const wrongCount =
+    activeGroup === "전체"
+      ? items.filter((it) => wrongIdSet.has(itemId(it))).length
+      : items.filter((it) => (it.group ?? "전체") === activeGroup && wrongIdSet.has(itemId(it))).length;
   const msg =
     mode === "reviewWrong"
       ? `오답 다시보기까지 완료했어요.`
@@ -377,7 +386,9 @@ function markRight() {
 function startWrongReview() {
   const wrongIndices = items
     .map((it, i) => ({ it, i }))
-    .filter(({ it }) => (it.group ?? "전체") === activeGroup && wrongIdSet.has(itemId(it)))
+    .filter(({ it }) =>
+      (activeGroup === "전체" || (it.group ?? "전체") === activeGroup) && wrongIdSet.has(itemId(it)),
+    )
     .map(({ i }) => i);
 
   if (wrongIndices.length === 0) return;

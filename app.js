@@ -130,13 +130,21 @@ function rowsToItems(rows) {
     (hA.includes("문제") && hB.includes("키워드"));
   const data = headerLike ? trimmed.slice(1) : trimmed;
 
+  // 사용자가 변경한 구조: A=그룹(1/2/3), B=문제, C=키워드
+  const aIsGroup = headerLike && /그룹/i.test(hA) && hB.includes("문제") && hC.includes("키워드");
+
+  // (이전 지원) A=문제(탭), B=키워드
   const aIsProblem = headerLike && hA.includes("문제") && hB.includes("키워드");
 
-  // 케이스 1) 3열: A=문제(탭), B=키워드(화면 "문제"에 표시), C=설명/답(답 영역에 표시)
-  // 케이스 2) 2열(헤더가 문제/키워드): A=문제(탭), B=키워드(화면 "문제"에 표시)
-  // 케이스 3) 기존: A=인물(답), B=설명(문제)
+  // 케이스 1) (신규) 3열: A=그룹, B=문제, C=키워드
+  // 케이스 2) (이전) 3열: A=문제(탭), B=키워드(화면 "문제"), C=설명/답(답 영역)
+  // 케이스 3) (이전) 2열: A=문제(탭), B=키워드(화면 "문제")
+  // 케이스 4) 기존: A=인물(답), B=설명(문제)
   return data
     .map(([a, b, c]) => {
+      if (aIsGroup) {
+        return { group: a.trim(), prompt: b.trim(), answer: c.trim() };
+      }
       if (c && aIsProblem) {
         return { group: a.trim(), prompt: b.trim(), answer: c.trim() || a.trim() };
       }
@@ -246,7 +254,21 @@ function resetOrder() {
 function getGroups() {
   const groups = new Set();
   for (const it of items) groups.add(it.group ?? "전체");
-  return Array.from(groups);
+  const arr = Array.from(groups);
+  // 숫자 그룹이면 1,2,3... 오름차순 정렬
+  arr.sort((a, b) => {
+    if (a === "전체") return -1;
+    if (b === "전체") return 1;
+    const na = Number(a);
+    const nb = Number(b);
+    const aIsNum = Number.isFinite(na) && String(a).trim() !== "";
+    const bIsNum = Number.isFinite(nb) && String(b).trim() !== "";
+    if (aIsNum && bIsNum) return na - nb;
+    if (aIsNum) return -1;
+    if (bIsNum) return 1;
+    return String(a).localeCompare(String(b), "ko");
+  });
+  return arr;
 }
 
 function setActiveGroup(nextGroup) {

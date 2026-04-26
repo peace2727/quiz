@@ -33,9 +33,21 @@
 
         <div class="actions">
           <button id="reveal" class="primary" type="button">답안보기</button>
-          <button id="next" class="secondary" type="button">다음 →</button>
+          <button id="wrong" class="danger" type="button">틀림</button>
+          <button id="right" class="good" type="button">정답</button>
         </div>
       </section>
+
+      <dialog id="endDialog" class="dialog">
+        <form method="dialog" class="dialogBody">
+          <h2 class="dialogTitle">퀴즈 완료</h2>
+          <p id="endDialogText" class="dialogText">-</p>
+          <div class="dialogActions">
+            <button id="reviewWrong" class="secondary" type="button">틀린 문제 다시보기</button>
+            <button class="primary" value="close" type="submit">닫기</button>
+          </div>
+        </form>
+      </dialog>
 
       <section class="editor">
         <details>

@@ -153,20 +153,29 @@ const els = {
   answerBox: document.getElementById("answerBox"),
   answerText: document.getElementById("answerText"),
   reveal: document.getElementById("reveal"),
-  next: document.getElementById("next"),
+  wrong: document.getElementById("wrong"),
+  right: document.getElementById("right"),
   shuffle: document.getElementById("shuffle"),
   dataEditor: document.getElementById("dataEditor"),
   applyData: document.getElementById("applyData"),
   editorStatus: document.getElementById("editorStatus"),
+  endDialog: document.getElementById("endDialog"),
+  endDialogText: document.getElementById("endDialogText"),
+  reviewWrong: document.getElementById("reviewWrong"),
 };
 
 let items = [...DEFAULT_ITEMS];
 let order = [];
 let idx = 0;
+let mode = "normal"; // "normal" | "reviewWrong"
+let wrongSet = new Set(); // item index (in items) marked wrong during normal mode
 
 function resetOrder() {
   order = shuffleInPlace(items.map((_, i) => i));
   idx = 0;
+  mode = "normal";
+  wrongSet = new Set();
+  if (els.endDialog?.open) els.endDialog.close();
 }
 
 function render() {
@@ -180,12 +189,19 @@ function render() {
 
   if (order.length !== items.length) resetOrder();
 
+  if (idx >= order.length) {
+    showEndDialog();
+    return;
+  }
+
   const current = items[order[idx]];
   els.prompt.textContent = current.prompt;
   els.answerText.textContent = current.answer;
   els.answerBox.classList.add("hidden");
   els.reveal.textContent = "답안보기";
-  els.progress.textContent = `${idx + 1} / ${items.length}`;
+  const total = order.length;
+  const prefix = mode === "reviewWrong" ? "오답 다시보기 " : "";
+  els.progress.textContent = `${prefix}${idx + 1} / ${total}`;
 }
 
 function reveal() {
@@ -203,13 +219,53 @@ function toggleReveal() {
   else hide();
 }
 
-function next() {
-  if (items.length === 0) return;
+function showEndDialog() {
+  const wrongCount = wrongSet.size;
+  const total = items.length;
+  const msg =
+    mode === "reviewWrong"
+      ? `오답 다시보기까지 완료했어요.`
+      : wrongCount === 0
+        ? `모든 문제를 다 풀었어요. 오답이 없습니다! (${total} / ${total})`
+        : `모든 문제를 다 풀었어요. 오답 ${wrongCount}개가 있어요. (${total - wrongCount} / ${total})`;
 
+  els.endDialogText.textContent = msg;
+  els.reviewWrong.disabled = mode === "reviewWrong" || wrongCount === 0;
+  if (!els.endDialog.open) els.endDialog.showModal();
+}
+
+function advance() {
+  if (items.length === 0) return;
   idx += 1;
   if (idx >= order.length) {
-    resetOrder(); // 한 바퀴 돌면 다시 랜덤
+    showEndDialog();
+    return;
   }
+  render();
+}
+
+function markWrong() {
+  if (items.length === 0) return;
+  if (idx >= order.length) return;
+  const itemIndex = order[idx];
+  if (mode === "normal") wrongSet.add(itemIndex);
+  advance();
+}
+
+function markRight() {
+  if (items.length === 0) return;
+  if (idx >= order.length) return;
+  const itemIndex = order[idx];
+  if (mode === "normal") wrongSet.delete(itemIndex);
+  advance();
+}
+
+function startWrongReview() {
+  if (wrongSet.size === 0) return;
+  mode = "reviewWrong";
+  order = Array.from(wrongSet);
+  idx = 0;
+  if (els.endDialog?.open) els.endDialog.close();
   render();
 }
 
@@ -225,11 +281,13 @@ function initEditor() {
 }
 
 els.reveal.addEventListener("click", toggleReveal);
-els.next.addEventListener("click", next);
+els.wrong.addEventListener("click", markWrong);
+els.right.addEventListener("click", markRight);
 els.shuffle.addEventListener("click", () => {
   resetOrder();
   render();
 });
+els.reviewWrong.addEventListener("click", startWrongReview);
 
 els.applyData.addEventListener("click", () => {
   try {
@@ -244,15 +302,19 @@ els.applyData.addEventListener("click", () => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-    next();
-  } else if (e.key === " " && !e.repeat) {
+  if (e.key === " " && !e.repeat) {
     // space로 답안 토글 (입력창 포커스일 때는 제외)
     const tag = document.activeElement?.tagName?.toLowerCase?.();
     if (tag !== "textarea" && tag !== "input") {
       e.preventDefault();
       toggleReveal();
     }
+  } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    // Ctrl+Enter로 정답 처리
+    markRight();
+  } else if (e.key === "Backspace" && (e.ctrlKey || e.metaKey)) {
+    // Ctrl+Backspace로 틀림 처리
+    markWrong();
   }
 });
 

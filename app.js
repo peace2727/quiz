@@ -114,24 +114,37 @@ function csvParse(text) {
 }
 
 function rowsToItems(rows) {
-  // 최소 2열(A,B) 필요
+  // 최소 2열(A,B) 필요 (필요시 3열까지 사용)
   const trimmed = rows
-    .map((r) => [r?.[0] ?? "", r?.[1] ?? ""].map((x) => String(x).trim()))
-    .filter(([a, b]) => a || b);
+    .map((r) => [r?.[0] ?? "", r?.[1] ?? "", r?.[2] ?? ""].map((x) => String(x).trim()))
+    .filter(([a, b, c]) => a || b || c);
 
   if (trimmed.length === 0) return [];
 
   // 헤더 행 제거(있을 경우)
-  const [hA, hB] = trimmed[0];
+  const [hA, hB, hC] = trimmed[0];
   const headerLike =
-    /^(문제|키워드|답|인물)$/i.test(hA) ||
-    /^(문제|키워드|답|인물)$/i.test(hB) ||
+    /^(문제|키워드|답|인물|설명)$/i.test(hA) ||
+    /^(문제|키워드|답|인물|설명)$/i.test(hB) ||
+    /^(문제|키워드|답|인물|설명)$/i.test(hC) ||
     (hA.includes("문제") && hB.includes("키워드"));
   const data = headerLike ? trimmed.slice(1) : trimmed;
 
-  // 사용자 케이스: A=인물(답), B=설명(문제)
+  const aIsProblem = headerLike && hA.includes("문제") && hB.includes("키워드");
+
+  // 케이스 1) 3열: A=문제(탭), B=키워드(답), C=설명(문제 본문)
+  // 케이스 2) 2열(헤더가 문제/키워드): A=문제(탭/문제), B=키워드(답)
+  // 케이스 3) 기존: A=인물(답), B=설명(문제)
   return data
-    .map(([a, b]) => ({ answer: a.trim(), prompt: b.trim() }))
+    .map(([a, b, c]) => {
+      if (c) {
+        return { group: a.trim(), answer: b.trim(), prompt: c.trim() };
+      }
+      if (aIsProblem) {
+        return { group: a.trim(), answer: b.trim(), prompt: a.trim() };
+      }
+      return { group: "전체", answer: a.trim(), prompt: b.trim() };
+    })
     .filter((x) => x.answer && x.prompt);
 }
 
@@ -156,6 +169,7 @@ const els = {
   wrong: document.getElementById("wrong"),
   right: document.getElementById("right"),
   shuffle: document.getElementById("shuffle"),
+  tabs: document.getElementById("tabs"),
   dataEditor: document.getElementById("dataEditor"),
   applyData: document.getElementById("applyData"),
   editorStatus: document.getElementById("editorStatus"),
@@ -168,14 +182,106 @@ let items = [...DEFAULT_ITEMS];
 let order = [];
 let idx = 0;
 let mode = "normal"; // "normal" | "reviewWrong"
-let wrongSet = new Set(); // item index (in items) marked wrong during normal mode
+let activeGroup = "전체";
+let wrongIdSet = new Set(); // stable IDs for wrong items (persistable)
+
+function getSheetKey() {
+  // sheet URL별로 상태 저장 (모바일/PC 각각 기기 localStorage에 유지)
+  const sheetUrl = getSheetUrlFromQueryOrDefault();
+  return `quizState:v1:${sheetUrl}`;
+}
+
+function itemId(it) {
+  const g = it.group ?? "전체";
+  return `${g}\u0000${it.prompt}\u0000${it.answer}`;
+}
+
+function saveState() {
+  try {
+    const payload = {
+      activeGroup,
+      wrongIds: Array.from(wrongIdSet),
+      ts: Date.now(),
+    };
+    localStorage.setItem(getSheetKey(), JSON.stringify(payload));
+  } catch {
+    // ignore (storage full / blocked)
+  }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(getSheetKey());
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.activeGroup === "string") activeGroup = parsed.activeGroup || "전체";
+    if (Array.isArray(parsed?.wrongIds)) wrongIdSet = new Set(parsed.wrongIds.filter((x) => typeof x === "string"));
+  } catch {
+    // ignore
+  }
+}
+
+function buildOrderForActiveGroup() {
+  return shuffleInPlace(
+    items
+      .map((x, i) => ({ x, i }))
+      .filter(({ x }) => (x.group ?? "전체") === activeGroup)
+      .map(({ i }) => i),
+  );
+}
 
 function resetOrder() {
-  order = shuffleInPlace(items.map((_, i) => i));
+  order = buildOrderForActiveGroup();
   idx = 0;
   mode = "normal";
-  wrongSet = new Set();
   if (els.endDialog?.open) els.endDialog.close();
+  saveState();
+}
+
+function getGroups() {
+  const groups = new Set();
+  for (const it of items) groups.add(it.group ?? "전체");
+  return Array.from(groups);
+}
+
+function setActiveGroup(nextGroup) {
+  activeGroup = nextGroup || "전체";
+  if (els.endDialog?.open) els.endDialog.close();
+  mode = "normal";
+  order = buildOrderForActiveGroup();
+  idx = 0;
+  renderTabs();
+  render();
+  saveState();
+}
+
+function renderTabs() {
+  const groups = getGroups();
+  if (!els.tabs) return;
+
+  // group이 하나면 탭 영역 숨김
+  if (groups.length <= 1) {
+    els.tabs.classList.add("hidden");
+    els.tabs.innerHTML = "";
+    return;
+  }
+
+  els.tabs.classList.remove("hidden");
+  els.tabs.innerHTML = groups
+    .map((g) => {
+      const pressed = g === activeGroup ? "true" : "false";
+      return `<button type="button" class="tab ${g === activeGroup ? "isActive" : ""}" data-group="${encodeURIComponent(g)}" aria-pressed="${pressed}">${escapeHtml(g)}</button>`;
+    })
+    .join("");
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function render() {
@@ -187,7 +293,13 @@ function render() {
     return;
   }
 
-  if (order.length !== items.length) resetOrder();
+  // 현재 그룹에 해당하는 order가 없으면 재생성
+  if (order.length === 0) {
+    // activeGroup이 items에 없을 수 있으니, 첫 그룹으로 이동
+    const groups = getGroups();
+    activeGroup = groups[0] ?? "전체";
+    resetOrder();
+  }
 
   if (idx >= order.length) {
     showEndDialog();
@@ -220,8 +332,8 @@ function toggleReveal() {
 }
 
 function showEndDialog() {
-  const wrongCount = wrongSet.size;
-  const total = items.length;
+  const total = order.length;
+  const wrongCount = items.filter((it) => (it.group ?? "전체") === activeGroup && wrongIdSet.has(itemId(it))).length;
   const msg =
     mode === "reviewWrong"
       ? `오답 다시보기까지 완료했어요.`
@@ -248,7 +360,8 @@ function markWrong() {
   if (items.length === 0) return;
   if (idx >= order.length) return;
   const itemIndex = order[idx];
-  if (mode === "normal") wrongSet.add(itemIndex);
+  if (mode === "normal") wrongIdSet.add(itemId(items[itemIndex]));
+  saveState();
   advance();
 }
 
@@ -256,14 +369,20 @@ function markRight() {
   if (items.length === 0) return;
   if (idx >= order.length) return;
   const itemIndex = order[idx];
-  if (mode === "normal") wrongSet.delete(itemIndex);
+  if (mode === "normal") wrongIdSet.delete(itemId(items[itemIndex]));
+  saveState();
   advance();
 }
 
 function startWrongReview() {
-  if (wrongSet.size === 0) return;
+  const wrongIndices = items
+    .map((it, i) => ({ it, i }))
+    .filter(({ it }) => (it.group ?? "전체") === activeGroup && wrongIdSet.has(itemId(it)))
+    .map(({ i }) => i);
+
+  if (wrongIndices.length === 0) return;
   mode = "reviewWrong";
-  order = Array.from(wrongSet);
+  order = wrongIndices;
   idx = 0;
   if (els.endDialog?.open) els.endDialog.close();
   render();
@@ -288,11 +407,21 @@ els.shuffle.addEventListener("click", () => {
   render();
 });
 els.reviewWrong.addEventListener("click", startWrongReview);
+els.tabs?.addEventListener("click", (e) => {
+  const btn = e.target?.closest?.("button[data-group]");
+  if (!btn) return;
+  const g = decodeURIComponent(btn.getAttribute("data-group") || "");
+  if (!g || g === activeGroup) return;
+  setActiveGroup(g);
+});
 
 els.applyData.addEventListener("click", () => {
   try {
     const nextItems = tryParseItems(els.dataEditor.value);
     items = nextItems;
+    const groups = getGroups();
+    if (!groups.includes(activeGroup)) activeGroup = groups[0] ?? "전체";
+    renderTabs();
     resetOrder();
     render();
     setEditorStatus(`적용 완료: ${items.length}개`, "ok");
@@ -327,6 +456,9 @@ function getSheetUrlFromQueryOrDefault() {
 }
 
 async function boot() {
+  activeGroup = "전체";
+  loadState();
+  renderTabs();
   resetOrder();
   render();
   initEditor();
@@ -336,6 +468,10 @@ async function boot() {
     setEditorStatus("구글 시트에서 불러오는 중…", "info");
     const nextItems = await loadFromGoogleSheet(sheetUrl);
     items = nextItems;
+    // 저장된 activeGroup이 유효하면 유지, 아니면 첫 그룹으로
+    const groups = getGroups();
+    if (!groups.includes(activeGroup)) activeGroup = groups[0] ?? "전체";
+    renderTabs();
     resetOrder();
     render();
     initEditor();

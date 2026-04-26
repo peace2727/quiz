@@ -11,6 +11,7 @@
   --primary: #5ca7ff;
   --primary2: #3d8cff;
   --good: #72f2c0;
+  --danger: #ff6b7a;
 }
 
 *{ box-sizing: border-box; }
@@ -105,7 +106,7 @@ body{
 
 .actions{
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
   margin-top: 14px;
 }
@@ -123,6 +124,11 @@ button{
 button:hover{ background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
 button:active{ transform: translateY(1px); }
 button:focus-visible{ outline: none; box-shadow: var(--focus); }
+button:disabled{
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: saturate(0.9);
+}
 
 .primary{
   background: linear-gradient(180deg, rgba(92,167,255,0.26), rgba(92,167,255,0.12));
@@ -135,6 +141,22 @@ button:focus-visible{ outline: none; box-shadow: var(--focus); }
 .secondary{
   background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
 }
+.good{
+  background: linear-gradient(180deg, rgba(114,242,192,0.22), rgba(114,242,192,0.10));
+  border-color: rgba(114,242,192,0.35);
+}
+.good:hover{
+  background: linear-gradient(180deg, rgba(114,242,192,0.28), rgba(114,242,192,0.14));
+  border-color: rgba(114,242,192,0.55);
+}
+.danger{
+  background: linear-gradient(180deg, rgba(255,107,122,0.22), rgba(255,107,122,0.10));
+  border-color: rgba(255,107,122,0.35);
+}
+.danger:hover{
+  background: linear-gradient(180deg, rgba(255,107,122,0.28), rgba(255,107,122,0.14));
+  border-color: rgba(255,107,122,0.55);
+}
 .ghost{
   padding: 9px 10px;
   border-radius: 12px;
@@ -142,6 +164,62 @@ button:focus-visible{ outline: none; box-shadow: var(--focus); }
 }
 
 .hidden{ display: none; }
+
+.tabs{
+  display: flex;
+  gap: 8px;
+  padding: 6px 2px 10px;
+  margin: 0 0 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tab{
+  white-space: nowrap;
+  padding: 9px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+}
+.tab.isActive{
+  border-color: rgba(92,167,255,0.55);
+  background: rgba(92,167,255,0.14);
+}
+
+.dialog{
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 18px;
+  padding: 0;
+  background: rgba(15,22,38,0.96);
+  color: var(--text);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+  width: min(520px, calc(100vw - 28px));
+}
+.dialog::backdrop{
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(3px);
+}
+.dialogBody{
+  padding: 16px 16px 14px;
+}
+.dialogTitle{
+  margin: 2px 0 8px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.dialogText{
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.dialogActions{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.dialogActions button{
+  border-color: rgba(255,255,255,0.18);
+}
 
 .editor{
   margin-top: 14px;
@@ -189,4 +267,5 @@ textarea:focus-visible{ outline: none; box-shadow: var(--focus); }
 
 @media (max-width: 560px){
   .actions{ grid-template-columns: 1fr; }
+  .dialogActions{ grid-template-columns: 1fr; }
 }

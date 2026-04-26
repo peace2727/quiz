@@ -143,7 +143,9 @@ function rowsToItems(rows) {
   return data
     .map(([a, b, c]) => {
       if (aIsGroup) {
-        return { group: a.trim(), prompt: b.trim(), answer: c.trim() };
+        // A=그룹, B=문제, C=키워드
+        // 화면 "문제"(#prompt)에는 키워드(C), 답안보기에는 문제(B)
+        return { group: a.trim(), prompt: c.trim(), answer: b.trim() };
       }
       if (c && aIsProblem) {
         return { group: a.trim(), prompt: b.trim(), answer: c.trim() || a.trim() };
